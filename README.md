@@ -123,9 +123,9 @@ y = df["Interaction_type"]
 ## Rate limiting & responsible use
 
 To protect shared infrastructure and respect FlyBase resources, **downloads are rate-limited by default.**
--The download limit is enforced internally
--The library is intended for **academic use only**
--Bulk or automated scraping is strongly discouraged
+- The download limit is enforced internally
+- The library is intended for **academic use only**
+- Bulk or automated scraping is strongly discouraged
 
 Advanced users can modify the download limits via the Config class and config.json, but:
 **We strongly ask users NOT to bypass rate limits**,
@@ -134,10 +134,10 @@ as this project does not have the infrastructure to support large-scale or abusi
 ---
 ## Data source & disclaimer
 
--All datasets are retrieved directly from FlyBase
--This library is **not** affiliated with FlyBase
--Dataset availability may change over time
--Some datasets may become unavailable or updated without notice
+- All datasets are retrieved directly from FlyBase
+- This library is **not** affiliated with FlyBase
+- Dataset availability may change over time
+- Some datasets may become unavailable or updated without notice
 
 If you need guaranteed access or bulk data, please use FlyBase’s official distribution channels.
  **Official FlyBase Downloads Overview:** [FlyBase:Downloads_Overview](https://wiki.flybase.org/wiki/FlyBase:Downloads_Overview)
