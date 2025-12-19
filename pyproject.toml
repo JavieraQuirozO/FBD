@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flybasedownloads"
+version = "4.0.0"
+description = "Unofficial Python client for downloading and exploring FlyBase datasets for data analysis and machine learning."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [
+    { name = "Javiera Quiroz Olave" }
+]
+requires-python = ">=3.10"
+
+keywords = [
+    "flybase",
+    "bioinformatics",
+    "genomics",
+    "data-science",
+    "machine-learning",
+    "biology"
+]
+
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12"
+]
+
+dependencies = [
+    "pandas",
+    "requests",
+    "python-dotenv",
+    "platformdirs"
+]
+
+[project.urls]
+Homepage = "https://github.com/JavieraQuirozO/FBD"
+Documentation = "https://github.com/JavieraQuirozO/FBD"
+FlyBase = "https://wiki.flybase.org/wiki/FlyBase:Downloads_Overview"
+
