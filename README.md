@@ -130,8 +130,8 @@ To protect shared infrastructure and respect FlyBase resources, **downloads are 
 Advanced users can modify the download limits via the Config class and config.json, but:
 **We strongly ask users NOT to bypass rate limits**,
 as this project does not have the infrastructure to support large-scale or abusive usage.
----
 
+---
 ## Data source & disclaimer
 
 -All datasets are retrieved directly from FlyBase
