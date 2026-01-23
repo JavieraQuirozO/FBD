@@ -3,7 +3,6 @@ import os
 import sys
 import json
 from pathlib import Path
-from dotenv import load_dotenv
 from platformdirs import user_cache_dir, user_config_dir
 
 

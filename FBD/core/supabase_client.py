@@ -25,7 +25,7 @@ class SupabaseConnection:
         
         SupabaseConnection._client = create_client(url, key)
         
-
+        
     # ------------------------------------------------------------------
     # Connect with Supabase
     # ------------------------------------------------------------------
