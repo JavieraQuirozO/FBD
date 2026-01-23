@@ -41,7 +41,6 @@ df2 = fbd.download_file()
 
 #%%
 
-from FBD.fbd import FBD
 
 fbd = FBD("gene_genetic_interactions")
 

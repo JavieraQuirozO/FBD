@@ -16,9 +16,7 @@ class Config:
     The Config class is designed to be loaded once at application startup
     and provides class-level attributes for reading configuration values.
     """
-
-    REQUIRED_VARS = ["SUPABASE_URL", "SUPABASE_KEY"]
-
+    
     APP_NAME = "flybasedownloads"
 
     DEFAULT_CACHE_DIR = Path(user_cache_dir(APP_NAME))
@@ -26,8 +24,8 @@ class Config:
 
     CONFIG_FILE = Path(user_config_dir(APP_NAME)) / "config.json"
 
-    SUPABASE_URL = None
-    SUPABASE_KEY = None
+    SUPABASE_URL= "https://ipoleoimulkvsyhelkgx.supabase.co"
+    SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlwb2xlb2ltdWxrdnN5aGVsa2d4Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1Nzk4NTIsImV4cCI6MjA3NzE1NTg1Mn0.Ud_TPJIudNHZK54wC0VQbO-CkLl6mJr1h9I2ZTMvF0Q"
 
     DOWNLOAD_DIR = DEFAULT_DOWNLOAD_DIR
     CACHE_DIR = DEFAULT_CACHE_DIR
@@ -38,38 +36,6 @@ class Config:
     DOWNLOAD_MAX_CALLS = 15         
     DOWNLOAD_WINDOW_SECONDS = 3600  
     
-    @classmethod
-    def load_env(cls, env_path: str | None = None):
-        """
-        Load environment variables for the library.
-    
-        Priority:
-        1. Existing environment variables
-        2. Optional .env file (local development)
-    
-        Args:
-            env_path (str | None): Optional path to a .env file.
-        """
-    
-        if env_path:
-            env_file = Path(env_path).expanduser().resolve()
-            if not env_file.exists():
-                raise FileNotFoundError(f".env file not found: {env_file}")
-            load_dotenv(env_file)
-        else:
-            load_dotenv(override=False)
-            
-        missing = [v for v in cls.REQUIRED_VARS if not os.getenv(v)]
-        if missing:
-            raise EnvironmentError(
-                f"Missing required environment variables: {', '.join(missing)}"
-            )
-    
-        cls.SUPABASE_URL = os.environ["SUPABASE_URL"]
-        cls.SUPABASE_KEY = os.environ["SUPABASE_KEY"]
-    
-        cls.load_user_config()
-        cls.setup_dirs()
 
     @classmethod
     def load_user_config(cls):

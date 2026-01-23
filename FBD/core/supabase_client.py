@@ -20,7 +20,6 @@ class SupabaseConnection:
         Initializes the Supabase client using environment variables loaded through Config.
         Must be called before attempting to connect or authenticate.
         """
-        Config.load_env()
         url = Config.SUPABASE_URL
         key = Config.SUPABASE_KEY
         
