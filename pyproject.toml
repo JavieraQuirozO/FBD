@@ -1,47 +1,57 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=61,<69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "flybasedownloads"
 version = "4.0.0"
-description = "Unofficial Python client for downloading and exploring FlyBase datasets for data analysis and machine learning."
+description = "Unofficial Python client for downloading and exploring FlyBase datasets."
 readme = "README.md"
-license = { text = "MIT" }
-authors = [
-    { name = "Javiera Quiroz Olave" }
-]
 requires-python = ">=3.10"
+license = { text = "MIT" }
+
+authors = [
+    { name = "Javiera Quiroz Olave", email = "javiera.quiroz@biomedica.udec.cl" }
+]
 
 keywords = [
     "flybase",
+    "drosophila",
     "bioinformatics",
     "genomics",
-    "data-science",
-    "machine-learning",
+    "datasets",
     "biology"
 ]
 
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
-    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Intended Audience :: Education",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
-    "Programming Language :: Python :: 3.12"
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Bio-Informatics",
+    "Operating System :: OS Independent",
 ]
 
+
 dependencies = [
-    "pandas",
-    "requests",
-    "python-dotenv",
-    "platformdirs"
+    "requests>=2.28",
+    "pandas>=1.5",
+    "networkx>=2.8",
+    "obonet>=1.0",
+    "platformdirs>=3.0",
 ]
 
 [project.urls]
 Homepage = "https://github.com/JavieraQuirozO/FBD"
-Documentation = "https://github.com/JavieraQuirozO/FBD"
-FlyBase = "https://wiki.flybase.org/wiki/FlyBase:Downloads_Overview"
 
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["FBD*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["test"]

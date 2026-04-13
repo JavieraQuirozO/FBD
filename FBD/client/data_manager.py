@@ -1,314 +1,139 @@
 # -*- coding: utf-8 -*-
-
-from FBD.core.supabase_client import SupabaseConnection
+import requests
+from FBD.core.config import Config
 
 
 class DataManager:
     """
-    Provides high-level data access utilities for categories and file entries
-    stored in Supabase, and return processed, application-friendly structures.
-
-    This class is stateless and uses class/static methods exclusively.
+    Acceso a metadatos de datasets a través de la edge function.
+    Todos los métodos son estáticos; la clase no tiene estado.
+    Cada método realiza una o más llamadas HTTP a la edge function
+    y devuelve los datos procesados.
     """
 
-    SupabaseConnection.init()
-    
     @staticmethod
-    def get_categories():
-        """
-        Returns a list of category names from the `categories` table.
-
-        Returns:
-            list[str]: List of category names.
-        """
-        rows = SupabaseConnection.fetch_table("categories")
-        return [row["category"] for row in rows if "category" in row]
+    def _get(path: str, params: dict | None = None) -> dict:
+        """Realiza un GET a la edge function y retorna el JSON de respuesta."""
+        url = f"{Config.EDGE_FUNCTION_URL}/{path}"
+        response = requests.get(url, params=params, timeout=10)
+        response.raise_for_status()
+        return response.json()
 
     @staticmethod
-    def get_files_by_category(category_name=None):
+    def get_categories() -> list[str]:
+        """Retorna la lista de nombres de todas las categorías disponibles."""
+        data = DataManager._get("categories")
+        return data.get("categories", [])
+
+    @staticmethod
+    def get_files_by_category(category_name: str | None = None) -> dict | list:
         """
-        Returns datasets grouped by category, or from a specific category if provided.
-
-        Args:
-            category_name (str | None):
-                If provided, returns only datasets belonging to this category.
-
-        Returns:
-            dict[str, list[str]] | list[str]:
-                - If no category is given: a dict {category_name: [datasets]}.
-                - If a category is given: a list of datasets from that category.
+        Sin parámetro: retorna {categoria: [datasets]} para todas las categorías.
+        Con parámetro: retorna la lista de datasets de esa categoría.
         """
-        categories = SupabaseConnection.fetch_table("categories")
-        links = SupabaseConnection.fetch_table("links")
-
-        links = [link for link in links if link.get("link")]
-
         if category_name:
-            category = next(
-                (c for c in categories if c["category"] == category_name),
-                None
-            )
-            if not category:
-                return []
+            data = DataManager._get(f"categories/{requests.utils.quote(category_name)}")
+            return data.get("datasets", [])
 
-            return [
-                link["dataset"]
-                for link in links
-                if link["category_id"] == category["id"]
-            ]
+        categories = DataManager.get_categories()
         result = {}
-        for c in categories:
-            datasets = [
-                link["dataset"]
-                for link in links
-                if link["category_id"] == c["id"]
-            ]
+        for cat in categories:
+            datasets = DataManager.get_files_by_category(cat)
             if datasets:
-                result[c["category"]] = datasets
-
+                result[cat] = datasets
         return result
 
     @staticmethod
-    def search_files(dataset):
+    def search_files(dataset: str) -> dict:
         """
-        Performs a case-insensitive search for datasets in the `links` table.
-
-        Args:
-            dataset (str): A partial dataset to search for.
-
-        Returns:
-            dict[str, list[str]]:
-                Mapping of categories to matching datasets.
-                Excludes records without a valid link.
+        Búsqueda case-insensitive de datasets por subcadena.
+        Retorna {categoria: [datasets]} para resultados parciales,
+        o {"_exact": {dataset, link, filename, header}} para match exacto.
         """
-        client = SupabaseConnection.connect()
+        data = DataManager._get("search", params={"q": dataset})
+        status = data.get("status")
 
-        response = (
-            client.table("links")
-            .select("dataset, link, categories(category)")
-            .ilike("dataset", f"%{dataset}%")
-            .execute()
-        )
+        if status == "not_found":
+            return {}
 
-        rows = response.data or []
+        if status == "ok":
+            return {
+                "_exact": {
+                    "dataset":  data["dataset"],
+                    "link":     data["link"],
+                    "filename": data["filename"],
+                    "header":   data["header"],
+                }
+            }
 
-        rows = [r for r in rows if r.get("link")]
-
-        result = {}
-        for row in rows:
-            category_name = row.get("categories", {}).get("category", "Uncategorized")
-            dataset_value = row.get("dataset")
-
-            if dataset_value:
-                result.setdefault(category_name, []).append(dataset_value)
-
-        return result
+        return data.get("matches", {})
 
     @staticmethod
-    def get_description(dataset: str):
+    def get_description(dataset: str) -> str | None:
         """
-        Returns the description for a specific dataset.
-
-        Args:
-            dataset (str): The exact dataset to search for.
-
-        Returns:
-            str | None: The description, or None if not found or invalid.
+        Retorna la descripción del dataset, o None si no existe.
         """
-        client = SupabaseConnection.connect()
-
-        response = (
-            client.table("links")
-            .select("description, link")
-            .eq("dataset", dataset)
-            .limit(1)
-            .execute()
-        )
-
-        rows = response.data or []
-        if not rows:
-            print(f"Not found: '{dataset}'")
-            return None
-
-        row = rows[0]
-
-        if not row.get("link"):
-            print(f"Not found: '{dataset}' (no valid link)")
-            return None
-
-        return row.get("description")
+        try:
+            data = DataManager._get(f"datasets/{requests.utils.quote(dataset)}")
+            return data.get("description")
+        except requests.HTTPError as e:
+            if e.response.status_code == 404:
+                print(f"Not found: '{dataset}'")
+                return None
+            raise
 
     @staticmethod
-    def get_header_line(dataset: str) -> int:
+    def get_header_line(dataset: str) -> int | None:
         """
-        Returns the header line number associated with a specific dataset.
-
-        Args:
-            dataset (str): File dataset.
-
-        Returns:
-            int | None: The header line number, or None if not set.
-
-        Raises:
-            ValueError: If no matching record is found.
+        Retorna el número de línea del header almacenado para el dataset.
+        None indica que la detección debe ser automática.
         """
-        client = SupabaseConnection.connect()
-
-        response = (
-            client.table("links")
-            .select("header")
-            .eq("dataset", dataset)
-            .single()
-            .execute()
-        )
-
-        if not response.data:
-            raise ValueError(f"No header information found for dataset '{dataset}'.")
-
-        header_line = response.data.get("header")
-        return int(header_line) if header_line is not None else None
+        data = DataManager._get(f"datasets/{requests.utils.quote(dataset)}")
+        header = data.get("header")
+        return int(header) if header is not None else None
 
     @staticmethod
-    def set_header_line(dataset: str, header_line: int | None) -> dict:
+    def set_header_line(dataset: str, header_line: int | None, admin_key: str) -> dict:
         """
-        Updates the `header` field for a given dataset.
-
-        Args:
-            dataset (str): File dataset to update.
-            header_line (int | None): New header line value.
-
-        Returns:
-            dict: Operation status and response payload.
+        Actualiza el campo header del dataset. Requiere admin_key.
         """
-        client = SupabaseConnection.connect()
-
         if not dataset or dataset.strip() == "":
-            raise ValueError("dataset cannot be empty.")
+            raise ValueError("dataset no puede estar vacío.")
+
+        url = f"{Config.EDGE_FUNCTION_URL}/datasets/{requests.utils.quote(dataset)}/header"
+        response = requests.patch(
+            url,
+            json={"header": header_line},
+            headers={"X-Admin-Key": admin_key},
+            timeout=10,
+        )
+        return response.json()
+
+    @staticmethod
+    def get_filename(dataset: str) -> str | None:
+        """Retorna el nombre de archivo asociado al dataset."""
+        data = DataManager._get(f"datasets/{requests.utils.quote(dataset)}")
+        return data.get("filename")
+
+    @staticmethod
+    def get_column_descriptions(dataset: str, columns="all") -> dict:
+        """
+        Retorna las descripciones de columnas del dataset.
+        columns puede ser "all", un string o una lista de nombres.
+        """
+        if isinstance(columns, list):
+            cols_param = ",".join(columns)
+        elif columns == "all" or columns is None:
+            cols_param = "all"
+        else:
+            cols_param = columns
 
         try:
-            response = (
-                client.table("links")
-                .update({"header": header_line})
-                .eq("dataset", dataset)
-                .execute()
+            return DataManager._get(
+                f"datasets/{requests.utils.quote(dataset)}/columns",
+                params={"cols": cols_param},
             )
-
-            if not response.data:
-                raise ValueError(
-                    f"No record found with dataset '{dataset}' for update."
-                )
-
-            return {
-                "status": "success",
-                "message": f"Header updated for dataset '{dataset}'.",
-                "data": response.data,
-            }
-
-        except Exception as e:
-            return {
-                "status": "error",
-                "message": f"Failed to update header: {str(e)}",
-            }
-
-    @staticmethod
-    def get_filename(dataset: str):
-        """
-        Returns the filename associated with a given dataset.
-
-        Args:
-            dataset (str): The dataset to look up.
-
-        Returns:
-            str | None: Filename string, or None if missing.
-
-        Raises:
-            ValueError: If the dataset does not exist.
-        """
-        client = SupabaseConnection.connect()
-
-        response = (
-            client.table("links")
-            .select("filename")
-            .eq("dataset", dataset)
-            .single()
-            .execute()
-        )
-
-        if not response.data:
-            raise ValueError(f"No filename found for dataset '{dataset}'.")
-
-        filename = response.data.get("filename")
-        return str(filename) if filename is not None else None
-
-
-    @staticmethod
-    def find_in_column_description(file_id: int, columns=None) -> dict:
-        """
-        Search the column_description table by file_id.
-        
-        - If columns is None or "all": returns all rows for that file_id.
-        - If columns is a string: returns only that column.
-        - If columns is a list: returns only those matching names.
-        """
-
-        client = SupabaseConnection.connect()
-
-        query = (
-            client.table("column_description")
-            .select("df_column_name, description")
-            .eq("file_id", file_id)
-        )
-
-        # Filter by column(s)
-        if columns and columns != "all":
-            if isinstance(columns, str):
-                query = query.eq("df_column_name", columns)
-            elif isinstance(columns, list):
-                query = query.in_("df_column_name", columns)
-
-        res = query.execute()
-        rows = res.data or []
-
-        if not rows:
-            return {
-                "status": "empty",
-                "message": "No description found for the requested dataset.",
-                "data": {}
-            }
-
-        data = {r["df_column_name"]: r["description"] for r in rows}
-
-        return {
-            "status": "ok",
-            "data": data
-        }
-
-
-    @classmethod
-    def get_column_descriptions(cls, dataset: str, columns="all") -> dict:
-        """
-        Given a dataset, return column descriptions.
-
-        - First find file_id from 'links'.
-        - Then call find_in_column_description().
-        """
-
-        client = SupabaseConnection.connect()
-
-        res = (
-            client.table("links")
-            .select("id")
-            .eq("dataset", dataset)
-            .limit(1)
-            .execute()
-        )
-
-        if not res.data:
-            return {
-                "status": "not_found",
-                "message": f"dataset '{dataset}' not found. Use the exact dataset."
-            }
-
-        file_id = res.data[0]["id"]
-
-        return cls.find_in_column_description(file_id, columns)
+        except requests.HTTPError as e:
+            if e.response.status_code == 404:
+                return {"status": "not_found", "message": f"Dataset '{dataset}' no encontrado."}
+            raise

@@ -1,0 +1,31 @@
+# Builds y distribución
+dist/
+build/
+*.egg-info/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+
+# Entorno virtual
+.venv/
+venv/
+env/
+
+# Configuración local de Claude Code
+.claude/
+
+# Supabase (backend separado, no parte del paquete Python)
+supabase/
+
+# Documentación interna
+documentos/
+
+# Scripts sueltos en la raíz
+main.py
+
+# Archivos del sistema
+.DS_Store
+Thumbs.db
