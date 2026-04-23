@@ -14,9 +14,6 @@ __pycache__/
 venv/
 env/
 
-# Configuración local de Claude Code
-.claude/
-
 # Supabase (backend separado, no parte del paquete Python)
 supabase/
 
