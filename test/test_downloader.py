@@ -87,7 +87,7 @@ def test_download_file_rejects_non_exact_match():
         mock_search.return_value = {"status": "multiple"}
         result = Downloader.download_file("ambiguous_dataset")
         assert result["status"] == "error"
-        assert "No se puede descargar" in result["message"]
+        assert "Cannot download dataset" in result["message"]
 
 
 def test_download_file_success_tsv(tmp_path):
@@ -169,7 +169,7 @@ def test_download_file_unsupported_extension():
         result = Downloader.download_file("weird_dataset")
 
         assert result["status"] == "error"
-        assert "parser no soportado" in result["message"]
+        assert "Unsupported extension or parser" in result["message"]
 
 
 def test_download_asset_success(tmp_path):

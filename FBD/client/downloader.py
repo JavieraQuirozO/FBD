@@ -11,22 +11,22 @@ _rate_limiter = RateLimiter()
 
 class Downloader:
     """
-    Búsqueda y descarga de archivos. Consulta la edge function para obtener
-    metadatos (link, filename, header) y descarga el archivo directamente
-    desde la URL de almacenada. El parseo se delega en Parse.
+    File search and download helper. It queries the edge function to obtain
+    dataset metadata (link, filename, header, parser metadata) and downloads
+    the file from the registered URL. Parsing is delegated to the parse layer.
     """
 
     @classmethod
     def search_file(cls, dataset: str) -> dict:
         """
-        Busca un dataset en la edge function (GET /search?q={dataset}).
+        Search for a dataset in the edge function (GET /search?q={dataset}).
 
         Returns:
-            dict con status:
-                "ok"       → match exacto, incluye link, filename y header
-                "partial"  → un resultado parcial
-                "multiple" → varios resultados parciales
-                "not_found"→ sin resultados
+            dict with status:
+                "ok"        -> exact match, includes metadata needed to download
+                "partial"   -> one partial match
+                "multiple"  -> multiple partial matches
+                "not_found" -> no matches
         """
         response = requests.get(
             f"{Config.EDGE_FUNCTION_URL}/search",
@@ -52,10 +52,10 @@ class Downloader:
         if status == "not_found":
             return {
                 "status":  "not_found",
-                "message": data.get("message", f"No se encontró '{dataset}'."),
+                "message": data.get("message", f"Dataset '{dataset}' was not found."),
             }
 
-        # partial / multiple: aplana matches a lista
+        # Flatten grouped matches into a single list for the public client API.
         return {
             "status":  status,
             "message": data.get("message", ""),
@@ -65,17 +65,18 @@ class Downloader:
     @classmethod
     def download_file(cls, dataset: str) -> dict:
         """
-        Descarga y parsea el archivo del dataset.
+        Download and parse a dataset file.
 
-        Flujo:
-        1. Verifica rate limit local
-        2. Obtiene metadata desde la edge function
-        3. Descarga el archivo directamente desde la URL registrada
-        4. Descomprime si es .gz
-        5. Delega el parseo al dispatcher de la capa de parseo
+        Flow:
+        1. Check the local rate limit
+        2. Fetch metadata from the edge function
+        3. Download the file from the registered URL
+        4. Decompress it if it is a .gz file
+        5. Delegate parsing to the parse dispatcher
 
-        Usa caché local: si el archivo ya existe en DOWNLOAD_DIR, omite la descarga.
-        Solo procede con match exacto (status "ok").
+        Uses a local cache: if the decompressed file already exists in
+        DOWNLOAD_DIR, the download step is skipped.
+        Only proceeds for exact matches (status "ok").
         """
         asset = cls.download_asset(dataset)
         if asset.get("status") != "ok":
@@ -102,8 +103,8 @@ class Downloader:
     @classmethod
     def download_asset(cls, dataset: str) -> dict:
         """
-        Capa de transporte: resuelve metadata, descarga, descomprime y retorna
-        la ubicación local del archivo junto con su metadata.
+        Transport-layer helper: resolve metadata, download, decompress, and
+        return the local file path together with its metadata.
         """
         _rate_limiter.check()
 
@@ -111,7 +112,7 @@ class Downloader:
         if search_result.get("status") not in ["exact", "ok"]:
             return {
                 "status":  "error",
-                "message": f"No se puede descargar: status '{search_result.get('status')}'.",
+                "message": f"Cannot download dataset: status '{search_result.get('status')}'.",
             }
 
         download_dir = Path(Config.DOWNLOAD_DIR)

@@ -7,8 +7,8 @@ from FBD.client.parse import Parse
 
 class ParserDispatcher:
     """
-    Resuelve el parser apropiado a partir de la metadata del dataset y
-    transforma el archivo local descargado en el objeto Python esperado.
+    Resolve the appropriate parser from dataset metadata and transform
+    the downloaded local file into the expected Python object.
     """
 
     @staticmethod
@@ -30,4 +30,4 @@ class ParserDispatcher:
                 header=header,
             )
         except ValueError as exc:
-            raise ValueError(f"Extensión o parser no soportado para '{dataset}': {parser_type}") from exc
+            raise ValueError(f"Unsupported extension or parser for '{dataset}': {parser_type}") from exc

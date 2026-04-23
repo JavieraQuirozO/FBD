@@ -5,15 +5,15 @@ from FBD.core.config import Config
 
 class DataManager:
     """
-    Acceso a metadatos de datasets a través de la edge function.
-    Todos los métodos son estáticos; la clase no tiene estado.
-    Cada método realiza una o más llamadas HTTP a la edge function
-    y devuelve los datos procesados.
+    Dataset metadata access through the edge function.
+    All methods are static; the class is stateless.
+    Each method performs one or more HTTP requests to the edge function
+    and returns processed results.
     """
 
     @staticmethod
     def _get(path: str, params: dict | None = None) -> dict:
-        """Realiza un GET a la edge function y retorna el JSON de respuesta."""
+        """Perform a GET request to the edge function and return the JSON payload."""
         url = f"{Config.EDGE_FUNCTION_URL}/{path}"
         response = requests.get(url, params=params, timeout=10)
         response.raise_for_status()
@@ -21,15 +21,15 @@ class DataManager:
 
     @staticmethod
     def get_categories() -> list[str]:
-        """Retorna la lista de nombres de todas las categorías disponibles."""
+        """Return the list of all available category names."""
         data = DataManager._get("categories")
         return data.get("categories", [])
 
     @staticmethod
     def get_files_by_category(category_name: str | None = None) -> dict | list:
         """
-        Sin parámetro: retorna {categoria: [datasets]} para todas las categorías.
-        Con parámetro: retorna la lista de datasets de esa categoría.
+        Without a parameter, return {category: [datasets]} for all categories.
+        With a parameter, return the dataset list for that category.
         """
         if category_name:
             data = DataManager._get(f"categories/{requests.utils.quote(category_name)}")
@@ -46,10 +46,10 @@ class DataManager:
     @staticmethod
     def search_files(dataset: str) -> dict:
         """
-        Búsqueda case-insensitive de datasets por subcadena.
-        Retorna {categoria: [datasets]} para resultados parciales,
-        o {"_exact": {dataset, link, filename, header, parser_type, parse_config}}
-        para match exacto.
+        Case-insensitive dataset search by substring.
+        Returns {category: [datasets]} for partial matches,
+        or {"_exact": {dataset, link, filename, header, parser_type, parse_config}}
+        for an exact match.
         """
         data = DataManager._get("search", params={"q": dataset})
         status = data.get("status")
@@ -74,14 +74,14 @@ class DataManager:
     @staticmethod
     def get_dataset_metadata(dataset: str) -> dict:
         """
-        Retorna los metadatos completos de un dataset.
+        Return full metadata for a dataset.
         """
         return DataManager._get(f"datasets/{requests.utils.quote(dataset)}")
 
     @staticmethod
     def get_description(dataset: str) -> str | None:
         """
-        Retorna la descripción del dataset, o None si no existe.
+        Return the dataset description, or None if it does not exist.
         """
         try:
             data = DataManager.get_dataset_metadata(dataset)
@@ -95,8 +95,8 @@ class DataManager:
     @staticmethod
     def get_header_line(dataset: str) -> int | None:
         """
-        Retorna el número de línea del header almacenado para el dataset.
-        None indica que la detección debe ser automática.
+        Return the stored header line number for the dataset.
+        None means the header should be auto-detected.
         """
         data = DataManager.get_dataset_metadata(dataset)
         header = data.get("header")
@@ -105,10 +105,10 @@ class DataManager:
     @staticmethod
     def set_header_line(dataset: str, header_line: int | None, admin_key: str) -> dict:
         """
-        Actualiza el campo header del dataset. Requiere admin_key.
+        Update the dataset header field. Requires admin_key.
         """
         if not dataset or dataset.strip() == "":
-            raise ValueError("dataset no puede estar vacío.")
+            raise ValueError("dataset cannot be empty.")
 
         url = f"{Config.EDGE_FUNCTION_URL}/datasets/{requests.utils.quote(dataset)}/header"
         response = requests.patch(
@@ -121,15 +121,15 @@ class DataManager:
 
     @staticmethod
     def get_filename(dataset: str) -> str | None:
-        """Retorna el nombre de archivo asociado al dataset."""
+        """Return the filename associated with the dataset."""
         data = DataManager.get_dataset_metadata(dataset)
         return data.get("filename")
 
     @staticmethod
     def get_column_descriptions(dataset: str, columns="all") -> dict:
         """
-        Retorna las descripciones de columnas del dataset.
-        columns puede ser "all", un string o una lista de nombres.
+        Return dataset column descriptions.
+        columns can be "all", a string, or a list of names.
         """
         if isinstance(columns, list):
             cols_param = ",".join(columns)
@@ -145,5 +145,5 @@ class DataManager:
             )
         except requests.HTTPError as e:
             if e.response.status_code == 404:
-                return {"status": "not_found", "message": f"Dataset '{dataset}' no encontrado."}
+                return {"status": "not_found", "message": f"Dataset '{dataset}' was not found."}
             raise
