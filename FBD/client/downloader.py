@@ -3,8 +3,8 @@ import requests
 from pathlib import Path
 from FBD.core.config import Config
 from FBD.core.rate_limiter import RateLimiter
-from FBD.client.data_manager import DataManager
 from FBD.client.parse import Parse
+from FBD.client.parser_dispatcher import ParserDispatcher
 
 _rate_limiter = RateLimiter()
 
@@ -69,13 +69,41 @@ class Downloader:
 
         Flujo:
         1. Verifica rate limit local
-        2. Obtiene link, filename y header desde la edge function
-        3. Descarga el archivo directamente desde FlyBase
+        2. Obtiene metadata desde la edge function
+        3. Descarga el archivo directamente desde la URL registrada
         4. Descomprime si es .gz
-        5. Parsea según parser_type/parse_config o, como fallback, por extensión
+        5. Delega el parseo al dispatcher de la capa de parseo
 
         Usa caché local: si el archivo ya existe en DOWNLOAD_DIR, omite la descarga.
         Solo procede con match exacto (status "ok").
+        """
+        asset = cls.download_asset(dataset)
+        if asset.get("status") != "ok":
+            return asset
+
+        try:
+            data = ParserDispatcher.parse(
+                dataset=dataset,
+                local_path=asset["local_path"],
+                metadata=asset["metadata"],
+            )
+        except (KeyError, ValueError) as exc:
+            return {
+                "status": "error",
+                "file": dataset,
+                "message": str(exc),
+            }
+
+        if data is not None:
+            return {"status": "ok", "file": dataset, "data": data}
+        else:
+            return {"status": "error", "file": dataset}
+
+    @classmethod
+    def download_asset(cls, dataset: str) -> dict:
+        """
+        Capa de transporte: resuelve metadata, descarga, descomprime y retorna
+        la ubicación local del archivo junto con su metadata.
         """
         _rate_limiter.check()
 
@@ -96,7 +124,6 @@ class Downloader:
         destination     = download_dir / filename
         decompress_path = download_dir / _filename
 
-        # Caché: si el archivo descomprimido ya existe, no descarga de nuevo
         if not decompress_path.exists():
             response = requests.get(file_url, stream=True, timeout=60)
             response.raise_for_status()
@@ -111,53 +138,9 @@ class Downloader:
             else:
                 decompress_path = destination
 
-        try:
-            data = cls._parse_downloaded_file(
-                dataset=dataset,
-                local_path=decompress_path,
-                metadata=search_result,
-            )
-        except (KeyError, ValueError) as exc:
-            return {
-                "status": "error",
-                "file": dataset,
-                "message": str(exc),
-            }
-
-        if data is not None:
-            return {"status": "ok", "file": dataset, "data": data}
-        else:
-            return {"status": "error", "file": dataset}
-
-    @classmethod
-    def _parse_downloaded_file(cls, dataset: str, local_path: Path, metadata: dict) -> object:
-        parser_type = metadata.get("parser_type") or local_path.suffix.lstrip(".")
-        parse_config = metadata.get("parse_config") or {}
-
-        if parser_type == "tsv":
-            header = metadata.get("header")
-            if header is None:
-                header = DataManager.get_header_line(dataset)
-            return Parse.tsv_to_df(str(local_path), header)["data"]
-
-        if parser_type == "affy":
-            return Parse.affy_to_df(str(local_path))["data"]
-
-        if parser_type == "json":
-            return Parse.json_to_df(str(local_path))
-
-        if parser_type == "obo":
-            return Parse.obo_to_graph(str(local_path))
-
-        if parser_type == "txt":
-            return Parse.txt_to_df(str(local_path))
-
-        if parser_type == "fb":
-            data = Parse.fb_to_df(
-                str(local_path),
-                start_line=parse_config["start_line"],
-                columns=parse_config["columns"],
-            )
-            return data
-
-        raise ValueError(f"Extensión o parser no soportado para '{dataset}': {parser_type}")
+        return {
+            "status": "ok",
+            "file": dataset,
+            "local_path": decompress_path,
+            "metadata": search_result,
+        }

@@ -109,7 +109,7 @@ def test_download_file_success_tsv(tmp_path):
     with patch("FBD.client.downloader.Downloader.search_file", return_value=fake_search_result), \
          patch("FBD.client.downloader.Config.DOWNLOAD_DIR", tmp_path), \
          patch("FBD.client.downloader.requests.get", return_value=mock_file_response), \
-         patch("FBD.client.downloader.Parse.tsv_to_df", return_value={"data": fake_df}):
+         patch("FBD.client.parser_dispatcher.Parse.tsv_to_df", return_value={"data": fake_df}):
 
         result = Downloader.download_file("valid_dataset")
 
@@ -141,7 +141,7 @@ def test_download_file_success_fb(tmp_path):
          patch("FBD.client.downloader.Config.DOWNLOAD_DIR", tmp_path), \
          patch("FBD.client.downloader.requests.get", return_value=mock_file_response), \
          patch("FBD.client.downloader.Parse.decompress_gz", return_value=tmp_path / "gene_association.fb"), \
-         patch("FBD.client.downloader.Parse.fb_to_df", return_value=fake_df) as mock_fb:
+         patch("FBD.client.parser_dispatcher.Parse.fb_to_df", return_value=fake_df) as mock_fb:
 
         result = Downloader.download_file("gene_association")
 
@@ -170,6 +170,33 @@ def test_download_file_unsupported_extension():
 
         assert result["status"] == "error"
         assert "parser no soportado" in result["message"]
+
+
+def test_download_asset_success(tmp_path):
+    fake_search_result = {
+        "status": "ok",
+        "dataset": "valid_dataset",
+        "link": "http://example.com/file.tsv",
+        "filename": "file.tsv",
+        "header": 0,
+        "parser_type": "tsv",
+        "parse_config": {},
+    }
+
+    mock_file_response = MagicMock()
+    mock_file_response.iter_content.return_value = [b"col1\tcol2\n1\t2"]
+    mock_file_response.raise_for_status.return_value = None
+
+    with patch("FBD.client.downloader.Downloader.search_file", return_value=fake_search_result), \
+         patch("FBD.client.downloader.Config.DOWNLOAD_DIR", tmp_path), \
+         patch("FBD.client.downloader.requests.get", return_value=mock_file_response):
+
+        result = Downloader.download_asset("valid_dataset")
+
+        assert result["status"] == "ok"
+        assert result["file"] == "valid_dataset"
+        assert result["metadata"]["parser_type"] == "tsv"
+        assert Path(result["local_path"]).name == "file.tsv"
 
 
 def test_rate_limiter_blocks(isolated_cache):
