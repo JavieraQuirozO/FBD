@@ -13,7 +13,7 @@ class Downloader:
     """
     Búsqueda y descarga de archivos. Consulta la edge function para obtener
     metadatos (link, filename, header) y descarga el archivo directamente
-    desde la URL de FlyBase. El parseo se delega en Parse.
+    desde la URL de almacenada. El parseo se delega en Parse.
     """
 
     @classmethod
@@ -40,11 +40,13 @@ class Downloader:
 
         if status == "ok":
             return {
-                "status":   "ok",
-                "dataset":  data["dataset"],
-                "link":     data["link"],
-                "filename": data["filename"],
-                "header":   data["header"],
+                "status":      "ok",
+                "dataset":     data["dataset"],
+                "link":        data["link"],
+                "filename":    data["filename"],
+                "header":      data["header"],
+                "parser_type": data.get("parser_type"),
+                "parse_config": data.get("parse_config"),
             }
 
         if status == "not_found":
@@ -70,7 +72,7 @@ class Downloader:
         2. Obtiene link, filename y header desde la edge function
         3. Descarga el archivo directamente desde FlyBase
         4. Descomprime si es .gz
-        5. Parsea según extensión (.tsv, .json, .obo, .txt)
+        5. Parsea según parser_type/parse_config o, como fallback, por extensión
 
         Usa caché local: si el archivo ya existe en DOWNLOAD_DIR, omite la descarga.
         Solo procede con match exacto (status "ok").
@@ -109,34 +111,53 @@ class Downloader:
             else:
                 decompress_path = destination
 
-        extension = decompress_path.suffix.lstrip(".")
-
-        if extension == "tsv":
-            if "affy" in filename:
-                data = Parse.affy_to_df(str(decompress_path))["data"]
-            else:
-                # El header viene en el resultado de búsqueda; solo consulta la
-                # edge function como fallback si no está presente.
-                header = search_result.get("header") or DataManager.get_header_line(dataset)
-                data   = Parse.tsv_to_df(str(decompress_path), header)["data"]
-
-        elif extension == "json":
-            data = Parse.json_to_df(str(decompress_path))
-
-        elif extension == "obo":
-            data = Parse.obo_to_graph(str(decompress_path))
-
-        elif extension == "txt":
-            data = Parse.txt_to_df(str(decompress_path))
-
-        else:
+        try:
+            data = cls._parse_downloaded_file(
+                dataset=dataset,
+                local_path=decompress_path,
+                metadata=search_result,
+            )
+        except (KeyError, ValueError) as exc:
             return {
-                "status":  "error",
-                "file":    dataset,
-                "message": f"Extensión no soportada: .{extension}",
+                "status": "error",
+                "file": dataset,
+                "message": str(exc),
             }
 
         if data is not None:
             return {"status": "ok", "file": dataset, "data": data}
         else:
             return {"status": "error", "file": dataset}
+
+    @classmethod
+    def _parse_downloaded_file(cls, dataset: str, local_path: Path, metadata: dict) -> object:
+        parser_type = metadata.get("parser_type") or local_path.suffix.lstrip(".")
+        parse_config = metadata.get("parse_config") or {}
+
+        if parser_type == "tsv":
+            header = metadata.get("header")
+            if header is None:
+                header = DataManager.get_header_line(dataset)
+            return Parse.tsv_to_df(str(local_path), header)["data"]
+
+        if parser_type == "affy":
+            return Parse.affy_to_df(str(local_path))["data"]
+
+        if parser_type == "json":
+            return Parse.json_to_df(str(local_path))
+
+        if parser_type == "obo":
+            return Parse.obo_to_graph(str(local_path))
+
+        if parser_type == "txt":
+            return Parse.txt_to_df(str(local_path))
+
+        if parser_type == "fb":
+            data = Parse.fb_to_df(
+                str(local_path),
+                start_line=parse_config["start_line"],
+                columns=parse_config["columns"],
+            )
+            return data
+
+        raise ValueError(f"Extensión o parser no soportado para '{dataset}': {parser_type}")

@@ -64,11 +64,14 @@ def test_search_files_exact():
             "dataset": "gene_interactions",
             "link": "http://example.com/file.tsv",
             "filename": "file.tsv",
-            "header": 0
+            "header": 0,
+            "parser_type": "tsv",
+            "parse_config": {"delimiter": "\\t"},
         })
         result = DataManager.search_files("gene_interactions")
         assert "_exact" in result
         assert result["_exact"]["dataset"] == "gene_interactions"
+        assert result["_exact"]["parser_type"] == "tsv"
 
 
 def test_search_files_partial():
@@ -95,7 +98,9 @@ def test_get_description_success():
         mock_get.return_value = make_mock_response({
             "status": "ok",
             "description": "Some description",
-            "link": "http://example.com/file.tsv"
+            "link": "http://example.com/file.tsv",
+            "parser_type": "tsv",
+            "parse_config": {},
         })
         result = DataManager.get_description("valid_dataset")
         assert result == "Some description"
@@ -110,23 +115,53 @@ def test_get_description_not_found():
 
 def test_get_header_line_success():
     with patch("FBD.client.data_manager.requests.get") as mock_get:
-        mock_get.return_value = make_mock_response({"status": "ok", "header": 3})
+        mock_get.return_value = make_mock_response({
+            "status": "ok",
+            "header": 3,
+            "parser_type": "tsv",
+            "parse_config": {},
+        })
         result = DataManager.get_header_line("dataset")
         assert result == 3
 
 
 def test_get_header_line_none():
     with patch("FBD.client.data_manager.requests.get") as mock_get:
-        mock_get.return_value = make_mock_response({"status": "ok", "header": None})
+        mock_get.return_value = make_mock_response({
+            "status": "ok",
+            "header": None,
+            "parser_type": "tsv",
+            "parse_config": {},
+        })
         result = DataManager.get_header_line("dataset")
         assert result is None
 
 
 def test_get_filename_success():
     with patch("FBD.client.data_manager.requests.get") as mock_get:
-        mock_get.return_value = make_mock_response({"status": "ok", "filename": "file.tsv"})
+        mock_get.return_value = make_mock_response({
+            "status": "ok",
+            "filename": "file.tsv",
+            "parser_type": "tsv",
+            "parse_config": {},
+        })
         result = DataManager.get_filename("dataset")
         assert result == "file.tsv"
+
+
+def test_get_dataset_metadata_success():
+    with patch("FBD.client.data_manager.requests.get") as mock_get:
+        mock_get.return_value = make_mock_response({
+            "status": "ok",
+            "dataset": "gene_association",
+            "filename": "gene_association.fb.gz",
+            "header": 5,
+            "parser_type": "fb",
+            "parse_config": {"start_line": 5},
+        })
+        result = DataManager.get_dataset_metadata("gene_association")
+        assert result["parser_type"] == "fb"
+        assert result["parse_config"]["start_line"] == 5
 
 
 # ── Escritura ──────────────────────────────────────────────────────────────────

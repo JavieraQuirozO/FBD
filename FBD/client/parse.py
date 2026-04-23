@@ -304,7 +304,7 @@ class Parse:
             raise RuntimeError(f"Error reading TXT '{file_path}': {e}")
     
     @staticmethod    
-    def fb_to_df(file_path, start_line, columns): #unsupported file extension at the moment
+    def fb_to_df(file_path, start_line, columns):
         """
         Parse a FlyBase-style tab-delimited file (.fb), compressed or uncompressed.
 

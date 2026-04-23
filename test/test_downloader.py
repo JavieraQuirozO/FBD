@@ -45,13 +45,16 @@ def test_search_file_exact_match():
             "dataset": "valid_dataset",
             "link": "http://example.com/file.tsv",
             "filename": "file.tsv",
-            "header": 0
+            "header": 0,
+            "parser_type": "tsv",
+            "parse_config": {},
         })
         result = Downloader.search_file("valid_dataset")
         assert result["status"] == "ok"
         assert result["dataset"] == "valid_dataset"
         assert result["link"].startswith("http")
         assert result["filename"] == "file.tsv"
+        assert result["parser_type"] == "tsv"
 
 
 def test_search_file_single_partial_match():
@@ -93,7 +96,9 @@ def test_download_file_success_tsv(tmp_path):
         "dataset": "valid_dataset",
         "link": "http://example.com/file.tsv",
         "filename": "file.tsv",
-        "header": 0
+        "header": 0,
+        "parser_type": "tsv",
+        "parse_config": {},
     }
     fake_df = MagicMock()
 
@@ -113,13 +118,48 @@ def test_download_file_success_tsv(tmp_path):
         assert result["data"] is fake_df
 
 
+def test_download_file_success_fb(tmp_path):
+    fake_search_result = {
+        "status": "ok",
+        "dataset": "gene_association",
+        "link": "http://example.com/gene_association.fb.gz",
+        "filename": "gene_association.fb.gz",
+        "header": None,
+        "parser_type": "fb",
+        "parse_config": {
+            "start_line": 5,
+            "columns": ["DB", "DB Object ID"],
+        },
+    }
+    fake_df = MagicMock()
+
+    mock_file_response = MagicMock()
+    mock_file_response.iter_content.return_value = [b"fake gz payload"]
+    mock_file_response.raise_for_status.return_value = None
+
+    with patch("FBD.client.downloader.Downloader.search_file", return_value=fake_search_result), \
+         patch("FBD.client.downloader.Config.DOWNLOAD_DIR", tmp_path), \
+         patch("FBD.client.downloader.requests.get", return_value=mock_file_response), \
+         patch("FBD.client.downloader.Parse.decompress_gz", return_value=tmp_path / "gene_association.fb"), \
+         patch("FBD.client.downloader.Parse.fb_to_df", return_value=fake_df) as mock_fb:
+
+        result = Downloader.download_file("gene_association")
+
+        assert result["status"] == "ok"
+        assert result["file"] == "gene_association"
+        assert result["data"] is fake_df
+        mock_fb.assert_called_once()
+
+
 def test_download_file_unsupported_extension():
     fake_search_result = {
         "status": "ok",
         "dataset": "weird_dataset",
         "link": "http://example.com/file.xyz",
         "filename": "file.xyz",
-        "header": None
+        "header": None,
+        "parser_type": "xyz",
+        "parse_config": {},
     }
 
     with patch("FBD.client.downloader.Downloader.search_file", return_value=fake_search_result), \
@@ -129,7 +169,7 @@ def test_download_file_unsupported_extension():
         result = Downloader.download_file("weird_dataset")
 
         assert result["status"] == "error"
-        assert "Extensión no soportada" in result["message"]
+        assert "parser no soportado" in result["message"]
 
 
 def test_rate_limiter_blocks(isolated_cache):

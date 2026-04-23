@@ -48,7 +48,8 @@ class DataManager:
         """
         Búsqueda case-insensitive de datasets por subcadena.
         Retorna {categoria: [datasets]} para resultados parciales,
-        o {"_exact": {dataset, link, filename, header}} para match exacto.
+        o {"_exact": {dataset, link, filename, header, parser_type, parse_config}}
+        para match exacto.
         """
         data = DataManager._get("search", params={"q": dataset})
         status = data.get("status")
@@ -59,14 +60,23 @@ class DataManager:
         if status == "ok":
             return {
                 "_exact": {
-                    "dataset":  data["dataset"],
-                    "link":     data["link"],
-                    "filename": data["filename"],
-                    "header":   data["header"],
+                    "dataset":     data["dataset"],
+                    "link":        data["link"],
+                    "filename":    data["filename"],
+                    "header":      data["header"],
+                    "parser_type": data.get("parser_type"),
+                    "parse_config": data.get("parse_config"),
                 }
             }
 
         return data.get("matches", {})
+
+    @staticmethod
+    def get_dataset_metadata(dataset: str) -> dict:
+        """
+        Retorna los metadatos completos de un dataset.
+        """
+        return DataManager._get(f"datasets/{requests.utils.quote(dataset)}")
 
     @staticmethod
     def get_description(dataset: str) -> str | None:
@@ -74,7 +84,7 @@ class DataManager:
         Retorna la descripción del dataset, o None si no existe.
         """
         try:
-            data = DataManager._get(f"datasets/{requests.utils.quote(dataset)}")
+            data = DataManager.get_dataset_metadata(dataset)
             return data.get("description")
         except requests.HTTPError as e:
             if e.response.status_code == 404:
@@ -88,7 +98,7 @@ class DataManager:
         Retorna el número de línea del header almacenado para el dataset.
         None indica que la detección debe ser automática.
         """
-        data = DataManager._get(f"datasets/{requests.utils.quote(dataset)}")
+        data = DataManager.get_dataset_metadata(dataset)
         header = data.get("header")
         return int(header) if header is not None else None
 
@@ -112,7 +122,7 @@ class DataManager:
     @staticmethod
     def get_filename(dataset: str) -> str | None:
         """Retorna el nombre de archivo asociado al dataset."""
-        data = DataManager._get(f"datasets/{requests.utils.quote(dataset)}")
+        data = DataManager.get_dataset_metadata(dataset)
         return data.get("filename")
 
     @staticmethod
