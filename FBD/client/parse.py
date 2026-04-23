@@ -6,6 +6,49 @@ import obonet
 import csv
 
 class Parse:
+
+    @staticmethod
+    def parse(file_path: str | Path, parser_type: str, config: dict | None = None, header: int | None = None):
+        """
+        Unified parser entrypoint used by higher layers.
+
+        Parameters
+        ----------
+        file_path : str | Path
+            Local path to the downloaded file.
+        parser_type : str
+            Parser identifier, e.g. ``tsv``, ``json``, ``obo``, ``txt``, ``fb``.
+        config : dict | None
+            Parser-specific configuration.
+        header : int | None
+            Optional TSV header line override.
+        """
+        config = config or {}
+
+        if parser_type == "tsv":
+            return Parse.tsv_to_df(file_path, header)["data"]
+
+        if parser_type == "affy":
+            return Parse.affy_to_df(file_path)["data"]
+
+        if parser_type == "json":
+            return Parse.json_to_df(file_path)
+
+        if parser_type == "obo":
+            return Parse.obo_to_graph(file_path)
+
+        if parser_type == "txt":
+            sep = config.get("sep", "\t")
+            return Parse.txt_to_df(file_path, sep=sep)
+
+        if parser_type == "fb":
+            return Parse.fb_to_df(
+                file_path,
+                start_line=config["start_line"],
+                columns=config["columns"],
+            )
+
+        raise ValueError(f"Unsupported parser_type: {parser_type}")
     
     @staticmethod    
     def is_gzip(path):
