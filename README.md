@@ -2,6 +2,8 @@
 
 **FlyBase Downloads (FBD)** is a lightweight Python library that provides programmatic access to selected datasets from **FlyBase**, allowing researchers to search, download, and load biological datasets directly into Python objects (e.g. pandas DataFrames) for analysis, exploration, and machine learning workflows.
 
+**Offline mode note:** FBD can reuse previously downloaded datasets through its local cache when calling `download_file()`. Offline support currently applies only to cached dataset downloads, metadata and browsing features such as categories, search, descriptions, and column descriptions still require a network connection.
+
 **Important:** This is an **unofficial** library.  
 All data is **retrieved directly from FlyBase**, and availability depends entirely on FlyBase’s public resources.
 
@@ -147,5 +149,4 @@ If you need guaranteed access or bulk data, please use FlyBase’s official dist
 
 ## Citation
 If you use this library in academic work, please cite **FlyBase** as the original data source.
-
 

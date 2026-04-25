@@ -1,6 +1,8 @@
 import pytest
 from unittest.mock import patch, MagicMock
 from pathlib import Path
+import requests
+import json
 
 from FBD.client.downloader import Downloader
 from FBD.core.config import Config
@@ -189,6 +191,7 @@ def test_download_asset_success(tmp_path):
 
     with patch("FBD.client.downloader.Downloader.search_file", return_value=fake_search_result), \
          patch("FBD.client.downloader.Config.DOWNLOAD_DIR", tmp_path), \
+         patch("FBD.client.downloader.Config.CACHE_DIR", tmp_path), \
          patch("FBD.client.downloader.requests.get", return_value=mock_file_response):
 
         result = Downloader.download_asset("valid_dataset")
@@ -197,6 +200,67 @@ def test_download_asset_success(tmp_path):
         assert result["file"] == "valid_dataset"
         assert result["metadata"]["parser_type"] == "tsv"
         assert Path(result["local_path"]).name == "file.tsv"
+
+        metadata_cache = tmp_path / "metadata" / "valid_dataset.metadata.json"
+        assert metadata_cache.exists()
+        persisted = json.loads(metadata_cache.read_text(encoding="utf-8"))
+        assert persisted["dataset"] == "valid_dataset"
+        assert "link" not in persisted
+
+
+def test_download_asset_offline_uses_cached_metadata_and_local_file(tmp_path):
+    cached_metadata = {
+        "status": "ok",
+        "dataset": "gene_association",
+        "filename": "gene_association.fb.gz",
+        "header": None,
+        "parser_type": "fb",
+        "parse_config": {
+            "start_line": 5,
+            "columns": ["DB", "DB Object ID"],
+        },
+    }
+    local_file = tmp_path / "gene_association.fb"
+    local_file.write_text("cached file", encoding="utf-8")
+    metadata_dir = tmp_path / "metadata"
+    metadata_dir.mkdir()
+    (metadata_dir / "gene_association.metadata.json").write_text(
+        """
+{
+  "status": "ok",
+  "dataset": "gene_association",
+  "filename": "gene_association.fb.gz",
+  "header": null,
+  "parser_type": "fb",
+  "parse_config": {
+    "start_line": 5,
+    "columns": ["DB", "DB Object ID"]
+  }
+}
+        """.strip(),
+        encoding="utf-8",
+    )
+
+    with patch("FBD.client.downloader.Config.DOWNLOAD_DIR", tmp_path), \
+         patch("FBD.client.downloader.Config.CACHE_DIR", tmp_path), \
+         patch("FBD.client.downloader.Downloader.search_file", side_effect=requests.ConnectionError):
+
+        result = Downloader.download_asset("gene_association")
+
+        assert result["status"] == "ok"
+        assert result["local_path"] == local_file
+        assert result["metadata"] == cached_metadata
+
+
+def test_download_asset_offline_without_metadata_cache_returns_error(tmp_path):
+    with patch("FBD.client.downloader.Config.DOWNLOAD_DIR", tmp_path), \
+         patch("FBD.client.downloader.Config.CACHE_DIR", tmp_path), \
+         patch("FBD.client.downloader.Downloader.search_file", side_effect=requests.ConnectionError):
+
+        result = Downloader.download_asset("gene_association")
+
+        assert result["status"] == "error"
+        assert "no local metadata cache" in result["message"]
 
 
 def test_rate_limiter_blocks(isolated_cache):
