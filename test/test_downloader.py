@@ -263,6 +263,49 @@ def test_download_asset_offline_without_metadata_cache_returns_error(tmp_path):
         assert "no local metadata cache" in result["message"]
 
 
+def test_download_asset_rate_limited_uses_cached_metadata_and_local_file(tmp_path):
+    cached_metadata = {
+        "status": "ok",
+        "dataset": "gene_association",
+        "filename": "gene_association.fb.gz",
+        "header": None,
+        "parser_type": "fb",
+        "parse_config": {
+            "start_line": 5,
+            "columns": ["DB", "DB Object ID"],
+        },
+    }
+    local_file = tmp_path / "gene_association.fb"
+    local_file.write_text("cached file", encoding="utf-8")
+    metadata_dir = tmp_path / "metadata"
+    metadata_dir.mkdir()
+    (metadata_dir / "gene_association.metadata.json").write_text(
+        json.dumps(cached_metadata),
+        encoding="utf-8",
+    )
+
+    with patch("FBD.client.downloader.Config.DOWNLOAD_DIR", tmp_path), \
+         patch("FBD.client.downloader.Config.CACHE_DIR", tmp_path), \
+         patch("FBD.client.downloader._rate_limiter.check", side_effect=RuntimeError("Download limit reached")):
+
+        result = Downloader.download_asset("gene_association")
+
+        assert result["status"] == "ok"
+        assert result["local_path"] == local_file
+        assert result["metadata"] == cached_metadata
+
+
+def test_download_asset_rate_limited_without_cache_returns_rate_limit_error(tmp_path):
+    with patch("FBD.client.downloader.Config.DOWNLOAD_DIR", tmp_path), \
+         patch("FBD.client.downloader.Config.CACHE_DIR", tmp_path), \
+         patch("FBD.client.downloader._rate_limiter.check", side_effect=RuntimeError("Download limit reached")):
+
+        result = Downloader.download_asset("gene_association")
+
+        assert result["status"] == "error"
+        assert result["message"] == "Download limit reached"
+
+
 def test_rate_limiter_blocks(isolated_cache):
     Config.DOWNLOAD_RATE_LIMIT_ENABLED = True
     Config.DOWNLOAD_MAX_CALLS = 1

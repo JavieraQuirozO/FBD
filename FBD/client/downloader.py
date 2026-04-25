@@ -140,6 +140,18 @@ class Downloader:
         }
 
     @classmethod
+    def _rate_limit_cached_fallback(cls, dataset: str, metadata: dict | None, exc: RuntimeError) -> dict:
+        if metadata is not None:
+            cached_result = cls._cached_asset_result(dataset, metadata)
+            if cached_result.get("status") == "ok":
+                return cached_result
+
+        return {
+            "status": "error",
+            "message": str(exc),
+        }
+
+    @classmethod
     def download_file(cls, dataset: str) -> dict:
         """
         Download and parse a dataset file.
@@ -185,7 +197,10 @@ class Downloader:
         """
         cached_metadata = cls._load_metadata_cache(dataset)
 
-        _rate_limiter.check()
+        try:
+            _rate_limiter.check()
+        except RuntimeError as exc:
+            return cls._rate_limit_cached_fallback(dataset, cached_metadata, exc)
 
         try:
             search_result = cls.search_file(dataset)
